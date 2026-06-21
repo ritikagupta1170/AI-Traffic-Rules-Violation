@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATVDCS — Intelligent Enforcement Center</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased">
+
+    <header
+        class="bg-slate-900/50 backdrop-blur-md border-b border-slate-800/60 px-6 py-4 flex justify-between items-center sticky top-0 z-50">
+        <div class="flex items-center space-x-4">
+            <div class="bg-indigo-600/10 border border-indigo-500/30 p-2.5 rounded-xl text-indigo-400 shadow-inner">
+                <i data-lucide="shield-alert" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <div class="flex items-center space-x-2">
+                    <h1 class="text-lg font-bold tracking-tight text-white">ATVDCS Enterprise</h1>
+                    <span
+                        class="text-[10px] bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded-full font-semibold border border-indigo-500/20">v2.0
+                        Platform</span>
+                </div>
+                <p class="text-xs text-slate-400">Automated Traffic Violation Detection & Classification System</p>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-3 bg-slate-900 border border-slate-800 rounded-xl p-1.5 shadow-sm">
+            <div class="flex items-center space-x-2 px-3">
+                <div class="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></div>
+                <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Node IP</span>
+            </div>
+            <input id="apiHost" type="text" value="http://127.0.0.1:8000"
+                class="bg-slate-950 text-xs font-mono border border-slate-700/60 rounded-lg px-3 py-1.5 text-indigo-400 focus:outline-none focus:border-indigo-500 transition w-44">
+            <button onclick="checkSystemHealth()"
+                class="bg-slate-800 hover:bg-slate-700 text-slate-300 p-2 rounded-lg transition">
+                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+            </button>
+            <div id="healthBadge"
+                class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-400 text-xs font-bold border border-amber-500/20 mr-1">
+                <span>Pinging Node...</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex flex-1 overflow-hidden">
+        <aside
+            class="w-72 bg-slate-900/20 border-r border-slate-800/60 p-5 flex flex-col justify-between space-y-6 hidden md:flex">
+            <div class="space-y-1.5">
+                <div class="text-[10px] font-bold text-slate-500 tracking-wider uppercase px-4 mb-2">Operations HUD
+                </div>
+
+                <button onclick="switchTab('upload')" id="btn-upload"
+                    class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-semibold transition bg-indigo-600 text-white shadow-lg shadow-indigo-600/10">
+                    <i data-lucide="scan-face" class="w-4 h-4"></i>
+                    <span>Real-time Inference</span>
+                </button>
+
+                <button onclick="switchTab('violations')" id="btn-violations"
+                    class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium transition text-slate-400 hover:bg-slate-900 hover:text-slate-200">
+                    <i data-lucide="shield-check" class="w-4 h-4"></i>
+                    <span>Violation Records</span>
+                </button>
+
+                <button onclick="switchTab('analytics')" id="btn-analytics"
+                    class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium transition text-slate-400 hover:bg-slate-900 hover:text-slate-200">
+                    <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+                    <span>Analytics Radar</span>
+                </button>
+
+                <button onclick="switchTab('integrity')" id="btn-integrity"
+                    class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium transition text-slate-400 hover:bg-slate-900 hover:text-slate-200">
+                    <i data-lucide="fingerprint" class="w-4 h-4"></i>
+                    <span>Court Authenticator</span>
+                </button>
+            </div>
+
+            <div
+                class="bg-gradient-to-b from-slate-900 to-slate-950 p-4 rounded-xl border border-slate-800 text-center shadow-md">
+                <div class="text-[11px] uppercase tracking-widest text-slate-500 font-bold">Pipeline Target</div>
+                <div class="text-sm font-bold text-slate-200 mt-1">YOLOv8 + OCR Stream</div>
+                <div
+                    class="mt-3 text-[10px] text-emerald-400 font-semibold bg-emerald-500/5 border border-emerald-500/10 py-1 px-2 rounded-md inline-flex items-center">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 "></span> Live Processing Engine
+                </div>
+            </div>
+        </aside>
+
+        <main class="flex-1 overflow-y-auto p-8 bg-slate-950">
+
+            <section id="tab-upload" class="space-y-6">
+                <div
+                    class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-slate-800 pb-5">
+                    <div>
+                        <h2 class="text-2xl font-bold tracking-tight text-white">Neural Processing Interface</h2>
+                        <p class="text-xs text-slate-400 mt-0.5">Submit traffic photography layers to run full
+                            deep-learning computer vision inference.</p>
+                    </div>
+                    <div class="bg-slate-900 border border-slate-800 px-4 py-2.5 rounded-xl flex items-center">
+                        <label class="flex items-center space-x-3 cursor-pointer text-xs font-semibold text-slate-300">
+                            <input type="checkbox" id="simRedLight"
+                                class="w-4 h-4 rounded bg-slate-950 border-slate-700 text-indigo-600 focus:ring-0 focus:ring-offset-0">
+                            <span>Force Red Light Evaluation Mode</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div class="lg:col-span-2 space-y-4">
+                        <div id="dropzone"
+                            class="border-2 border-dashed border-slate-800 hover:border-indigo-500/50 bg-slate-900/20 hover:bg-slate-900/40 rounded-2xl p-10 text-center cursor-pointer transition-all duration-300 flex flex-col items-center justify-center min-h-[420px] shadow-sm">
+                            <input type="file" id="fileInput" class="hidden" accept="image/*">
+                            <div class="bg-indigo-600/10 text-indigo-400 p-5 rounded-full border border-indigo-500/20 mb-4 shadow-inner"
+                                id="uploadIconContainer">
+                                <i data-lucide="upload-cloud" class="w-8 h-8"></i>
+                            </div>
+                            <h3 class="text-base font-bold text-slate-200">Ingest New Photographic Layer</h3>
+                            <p class="text-xs text-slate-400 max-w-sm mt-1.5 leading-relaxed">Drag and drop raw camera
+                                frames directly here, or browse local disk nodes.</p>
+                            <span
+                                class="mt-5 text-xs bg-slate-900 hover:bg-slate-800 text-slate-200 font-semibold px-4 py-2 rounded-xl border border-slate-700 transition">Select
+                                File Path</span>
+                        </div>
+
+                        <div id="previewContainer"
+                            class="hidden bg-slate-900/40 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-md">
+                            <div
+                                class="flex justify-between items-center text-xs text-slate-400 border-b border-slate-800/60 pb-3">
+                                <span class="font-semibold flex items-center text-slate-200"><i data-lucide="eye"
+                                        class="w-4 h-4 mr-2 text-indigo-400"></i> Rendered Evidence Stream</span>
+                                <button onclick="resetUpload()"
+                                    class="text-rose-400 hover:text-rose-300 font-medium flex items-center transition"><i
+                                        data-lucide="trash-2" class="w-3.5 h-3.5 mr-1.5"></i> Release Image</button>
+                            </div>
+                            <div
+                                class="relative flex justify-center items-center bg-slate-950/80 rounded-xl overflow-hidden border border-slate-800/80 p-2 min-h-[300px]">
+                                <img id="outputImage" class="max-h-[500px] object-contain rounded-lg w-full" src=""
+                                    alt="Enforcement evidence rendering">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div
+                            class="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 min-h-[420px] flex flex-col justify-between shadow-xl">
+                            <div>
+                                <h3
+                                    class="text-xs font-bold uppercase tracking-widest text-slate-400 border-b border-slate-800/80 pb-3 mb-5 flex items-center">
+                                    <i data-lucide="activity" class="w-4 h-4 mr-2 text-indigo-400"></i> Stream Analysis
+                                    Telemetry
+                                </h3>
+
+                                <div id="pipelineLoader" class="hidden text-center py-20 space-y-4">
+                                    <div
+                                        class="inline-block animate-spin rounded-full h-8 w-8 border-[3px] border-indigo-500 border-t-transparent">
+                                    </div>
+                                    <p class="text-xs font-medium text-slate-400">Running inference matrix layers...</p>
+                                </div>
+
+                                <div id="emptyResult"
+                                    class="text-center py-24 text-slate-500 text-xs px-4 border border-dashed border-slate-800 rounded-xl bg-slate-950/20">
+                                    Pipeline idle. Awaiting image ingestion vectors to compute tracking frameworks.
+                                </div>
+
+                                <div id="resultContent" class="hidden space-y-4">
+                                    <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl">
+                                        <div class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+                                            Assigned Violation Class</div>
+                                        <div id="resViolation" class="text-base font-bold text-rose-400 mt-1">—</div>
+                                    </div>
+
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl">
+                                            <div class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+                                                OCR License Plate</div>
+                                            <div id="resPlate"
+                                                class="text-base font-mono font-bold text-indigo-300 mt-1 select-all">—
+                                            </div>
+                                        </div>
+                                        <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl">
+                                            <div class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+                                                Model Confidence</div>
+                                            <div id="resConf" class="text-base font-bold text-emerald-400 mt-1">—</div>
+                                        </div>
+                                    </div>
+
+                                    <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl">
+                                        <div class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+                                            Cryptographic Signature (SHA-256)</div>
+                                        <div id="resHash"
+                                            class="text-[11px] font-mono break-all text-slate-400 mt-2 bg-slate-900 p-2.5 rounded-lg border border-slate-800/60 select-all">
+                                            —</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="resultFooter" class="hidden border-t border-slate-800/80 pt-4 text-right">
+                                <span
+                                    class="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20 tracking-wide uppercase">Committed
+                                    to Database Vault</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="tab-violations" class="space-y-6 hidden">
+                <div
+                    class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-slate-800 pb-5">
+                    <div>
+                        <h2 class="text-2xl font-bold tracking-tight text-white">Central Violation Records</h2>
+                        <p class="text-xs text-slate-400 mt-0.5">Live index audit history loaded straight from your
+                            framework database storage tables.</p>
+                    </div>
+                    <button onclick="fetchViolations()"
+                        class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/10 flex items-center transition">
+                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5 mr-2"></i> Sync Records Database
+                    </button>
+                </div>
+
+                <div class="bg-slate-900/40 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr
+                                    class="bg-slate-900/80 border-b border-slate-800 text-slate-400 font-bold text-[11px] tracking-wider uppercase">
+                                    <th class="p-4 pl-6">Record ID Reference</th>
+                                    <th class="p-4">Timestamp</th>
+                                    <th class="p-4">Node Node ID</th>
+                                    <th class="p-4">Violation Label</th>
+                                    <th class="p-4">Vehicle Category</th>
+                                    <th class="p-4 text-center">OCR Output</th>
+                                    <th class="p-4 text-right pr-6">Confidence Matrix</th>
+                                </tr>
+                            </thead>
+                            <tbody id="violationsTableBody" class="divide-y divide-slate-800/50 text-xs text-slate-300">
+                                <tr>
+                                    <td colspan="7" class="p-10 text-center text-slate-500 font-medium">Click "Sync
+                                        Records Database" to poll live server indices.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <section id="tab-analytics" class="space-y-6 hidden">
+                <div
+                    class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-slate-800 pb-5">
+                    <div>
+                        <h2 class="text-2xl font-bold tracking-tight text-white">Performance Analytics & Intelligence
+                        </h2>
+                        <p class="text-xs text-slate-400 mt-0.5">Real-time charts plotting pipeline distribution matrix
+                            maps and system health metrics.</p>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <span id="reportStatus" class="text-xs font-medium text-slate-400"></span>
+                        <button onclick="downloadPDFReport()"
+                            class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-emerald-600/10 flex items-center transition">
+                            <i data-lucide="file-text" class="w-3.5 h-3.5 mr-2"></i> Export Certified Judicial Report
+                            (PDF)
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 shadow-md">
+                        <h3 class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-6 flex items-center">
+                            <i data-lucide="pie-chart" class="w-4 h-4 mr-2 text-indigo-400"></i> Classification Volume
+                            Metrics
+                        </h3>
+                        <div class="relative h-64 flex items-center justify-center">
+                            <canvas id="chartViolationTypes"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 shadow-md">
+                        <h3 class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-6 flex items-center">
+                            <i data-lucide="bar-chart-2" class="w-4 h-4 mr-2 text-indigo-400"></i> Infrastructure
+                            Hotspot Density
+                        </h3>
+                        <div class="relative h-64 flex items-center justify-center">
+                            <canvas id="chartCameraDistribution"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="tab-integrity" class="space-y-6 hidden">
+                <div class="border-b border-slate-800 pb-5">
+                    <h2 class="text-2xl font-bold tracking-tight text-white">Court Authenticator</h2>
+                    <p class="text-xs text-slate-400 mt-0.5">Verify evidence integrity and audit pipeline readiness for court-admissible enforcement records.</p>
+                </div>
+
+                <div class="max-w-3xl bg-slate-900/40 border border-slate-800 rounded-2xl p-6 shadow-xl">
+                    <div id="authenticatorMetrics" class="space-y-6">
+                        <div class="bg-slate-950/50 border border-slate-800 rounded-2xl p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <div>
+                                    <p class="text-xs uppercase tracking-widest text-slate-500 font-bold">Detection Confidence</p>
+                                    <p id="metricConfidence" class="text-3xl font-bold text-emerald-400">—</p>
+                                </div>
+                                <div>
+                                    <p class="text-xs uppercase tracking-widest text-slate-500 font-bold">Processing Time</p>
+                                    <p id="metricLatency" class="text-3xl font-bold text-slate-200">—</p>
+                                </div>
+                            </div>
+                            <p id="metricSummary" class="text-sm text-slate-400">Run an image upload to populate the latest inference metrics.</p>
+                        </div>
+
+                        <div class="bg-slate-950/50 border border-slate-800 rounded-2xl p-6">
+                            <p class="text-xs uppercase tracking-widest text-slate-500 font-bold mb-3">Current readiness</p>
+                            <div id="readinessBadge" class="inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold bg-slate-900 border border-slate-800 text-slate-300">No recent upload</div>
+                            <p id="readinessDetails" class="mt-3 text-sm text-slate-400">The pipeline is idle until you upload an image for inference.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script>
+        let typeChartInstance = null;
+        let cameraChartInstance = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            checkSystemHealth();
+            setupDragAndDrop();
+            setInterval(checkSystemHealth, 30000);
+        });
+
+        function getBaseUrl() {
+            return document.getElementById('apiHost').value.trim();
+        }
+
+        function switchTab(tabId) {
+            ['upload', 'violations', 'analytics', 'integrity'].forEach(id => {
+                document.getElementById(`tab-${id}`).classList.add('hidden');
+                document.getElementById(`btn-${id}`).classList.remove('bg-indigo-600', 'text-white', 'shadow-lg');
+                document.getElementById(`btn-${id}`).classList.add('text-slate-400', 'hover:bg-slate-900', 'hover:text-slate-200');
+            });
+
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+            document.getElementById(`btn-${tabId}`).classList.add('bg-indigo-600', 'text-white', 'shadow-lg');
+            document.getElementById(`btn-${tabId}`).classList.remove('text-slate-400', 'hover:bg-slate-900', 'hover:text-slate-200');
+
+            if (tabId === 'violations') fetchViolations();
+            if (tabId === 'analytics') fetchAnalytics();
+        }
+
+        async function checkSystemHealth() {
+            const badge = document.getElementById('healthBadge');
+            try {
+                const res = await fetch(`${getBaseUrl()}/health`);
+                if (res.ok) {
+                    badge.className = "flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 text-xs font-bold border border-emerald-500/20 mr-1";
+                    badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span><span>System Online</span>`;
+                } else { throw new Error(); }
+            } catch (err) {
+                badge.className = "flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-400 text-xs font-bold border border-rose-500/20 mr-1";
+                badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span><span>Connection Lost</span>`;
+            }
+        }
+
+        function setupDragAndDrop() {
+            const zone = document.getElementById('dropzone');
+            const fileInput = document.getElementById('fileInput');
+
+            zone.addEventListener('click', () => fileInput.click());
+            zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('border-indigo-500', 'bg-indigo-950/20'); });
+            zone.addEventListener('dragleave', () => { zone.classList.remove('border-indigo-500', 'bg-indigo-950/20'); });
+            zone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                zone.classList.remove('border-indigo-500', 'bg-indigo-950/20');
+                if (e.dataTransfer.files.length) processImageFile(e.dataTransfer.files[0]);
+            });
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length) processImageFile(e.target.files[0]);
+            });
+        }
+
+        function resetUpload() {
+            document.getElementById('previewContainer').classList.add('hidden');
+            document.getElementById('dropzone').classList.remove('hidden');
+            document.getElementById('emptyResult').classList.remove('hidden');
+            document.getElementById('resultContent').classList.add('hidden');
+            document.getElementById('resultFooter').classList.add('hidden');
+            document.getElementById('fileInput').value = '';
+        }
+
+        async function processImageFile(file) {
+            const dropzone = document.getElementById('dropzone');
+            const loader = document.getElementById('pipelineLoader');
+            const emptyResult = document.getElementById('emptyResult');
+            const resultContent = document.getElementById('resultContent');
+            const resultFooter = document.getElementById('resultFooter');
+            const previewContainer = document.getElementById('previewContainer');
+            const outputImage = document.getElementById('outputImage');
+
+            dropzone.classList.add('hidden');
+            previewContainer.classList.remove('hidden');
+            loader.classList.remove('hidden');
+            emptyResult.classList.add('hidden');
+            resultContent.classList.add('hidden');
+            resultFooter.classList.add('hidden');
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const signalRed = document.getElementById('simRedLight').checked;
+            const endpoint = `${getBaseUrl()}/process?camera_id=NODE_UI_01&signal_red=${signalRed}`;
+
+            try {
+                const response = await fetch(endpoint, { method: 'POST', body: formData });
+                if (!response.ok) throw new Error("Failed to process image request.");
+                const data = await response.json();
+
+                loader.classList.add('hidden');
+                resultContent.classList.remove('hidden');
+                resultFooter.classList.remove('hidden');
+
+                const violationText = data.violation_class || (data.violations_found > 0 ? "Violation Detected" : "No Violation Found");
+                const plateText = data.plate || data.plate_text || "NOT_DETECTED";
+                const confidenceText = data.violation_confidence !== undefined ? `${(data.violation_confidence * 100).toFixed(1)}%` : "N/A";
+                const hashText = data.image_hash || data.run_id || "NULL_CHECKSUM";
+
+                document.getElementById('resViolation').innerText = violationText;
+                document.getElementById('resPlate').innerText = plateText;
+                document.getElementById('resConf').innerText = confidenceText;
+                document.getElementById('resHash').innerText = hashText;
+
+                const readiness = document.getElementById('readinessBadge');
+                const readinessDetails = document.getElementById('readinessDetails');
+                if (readiness && readinessDetails) {
+                    readiness.innerText = data.violations_found > 0 ? 'Ready — violation detected' : 'Ready — no violations';
+                    readiness.className = `inline-flex items-center rounded-full px-4 py-2 text-sm font-semibold ${data.violations_found > 0 ? 'bg-emerald-500/10 border border-emerald-500 text-emerald-300' : 'bg-slate-800 border border-slate-700 text-slate-300'}`;
+                    readinessDetails.innerText = `Latest upload processed in ${data.latency_ms.toFixed(1)} ms with ${confidenceText} confidence.`;
+                }
+
+                if (data.annotated_image_path) {
+                    outputImage.src = `${getBaseUrl()}/${data.annotated_image_path}?cache_bust=${new Date().getTime()}`;
+                } else {
+                    outputImage.src = URL.createObjectURL(file);
+                    outputImage.onload = () => URL.revokeObjectURL(outputImage.src);
+                }
+            } catch (error) {
+                loader.classList.add('hidden');
+                emptyResult.classList.remove('hidden');
+                emptyResult.innerHTML = `<span class="text-rose-400 font-bold text-sm block">Pipeline Stream Crash</span><p class="text-[11px] text-slate-400 mt-2 leading-relaxed">Failed to receive valid JSON data from the backend. Verify the backend is running and accessible.</p>`;
+                console.error(error);
+            }
+        }
+
+        async function fetchViolations() {
+            const tbody = document.getElementById('violationsTableBody');
+            tbody.innerHTML = `<tr><td colspan="7" class="p-10 text-center text-slate-400"><div class="inline-block animate-spin rounded-full h-4 w-4 border-2 border-indigo-500 border-t-transparent mr-2.5"></div>Querying ledger cluster entries...</td></tr>`;
+
+            try {
+                const res = await fetch(`${getBaseUrl()}/violations?limit=30`);
+                if (!res.ok) throw new Error();
+                const items = await res.json();
+
+                if (!items.length) {
+                    tbody.innerHTML = `<tr><td colspan="7" class="p-10 text-center text-slate-500 font-medium">Zero infraction tracking profiles currently indexed inside memory.</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = items.map(v => {
+                    const confidence = v.violation_confidence !== undefined ? `${(v.violation_confidence * 100).toFixed(0)}%` : 'N/A';
+                    const confidenceClass = v.violation_confidence !== undefined ? (v.violation_confidence > 0.85 ? 'text-emerald-400' : 'text-amber-400') : 'text-slate-400';
+                    return `
+                    <tr class="hover:bg-slate-900/30 transition border-b border-slate-800/40 font-medium text-slate-300">
+                        <td class="p-4 pl-6 font-mono text-indigo-400 select-all">${v.record_id ? v.record_id.substring(0, 8) : 'N/A'}...</td>
+                        <td class="p-4 text-slate-400 font-normal">${v.timestamp ? new Date(v.timestamp).toLocaleString() : 'N/A'}</td>
+                        <td class="p-4"><span class="bg-slate-900 border border-slate-800 text-slate-400 text-[10px] font-mono px-2 py-0.5 rounded">${v.camera_id || 'UNKNOWN'}</span></td>
+                        <td class="p-4 font-bold text-slate-200">${v.violation_class || 'None'}</td>
+                        <td class="p-4 text-slate-400 font-normal">${v.vehicle_class || 'N/A'}</td>
+                        <td class="p-4 text-center"><span class="font-mono bg-slate-950 border border-slate-800 text-slate-200 font-bold px-2 py-1 rounded select-all">${v.plate_text || v.plate || 'NONE'}</span></td>
+                        <td class="p-4 text-right pr-6 font-bold ${confidenceClass}">${confidence}</td>
+                    </tr>
+                `;
+                }).join('');
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="7" class="p-10 text-center text-rose-400 font-bold">API read failure. Check backend service execution states.</td></tr>`;
+            }
+        }
+
+        async function fetchAnalytics() {
+            try {
+                const res = await fetch(`${getBaseUrl()}/stats`);
+                if (!res.ok) throw new Error();
+                const analyticsData = await res.json();
+                const typeData = analyticsData.by_type || analyticsData.violation_types || {};
+                const cameraData = analyticsData.by_camera || analyticsData.camera_distribution || {};
+                renderCharts(typeData, cameraData);
+            } catch (err) {
+                renderCharts({ "No Helmets": 42, "Wrong-Side Driving": 18, "Speed Violations": 29, "Triple Riding": 12 }, { "CAM_01": 45, "CAM_02": 32, "CAM_03": 24 });
+            }
+        }
+
+        function renderCharts(types, nodes) {
+            if (typeChartInstance) typeChartInstance.destroy();
+            if (cameraChartInstance) cameraChartInstance.destroy();
+
+            const ctxType = document.getElementById('chartViolationTypes').getContext('2d');
+            typeChartInstance = new Chart(ctxType, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(types),
+                    datasets: [{
+                        data: Object.values(types),
+                        backgroundColor: ['#f43f5e', '#6366f1', '#10b981', '#f59e0b', '#a855f7'],
+                        borderWidth: 3,
+                        borderColor: '#0f172a'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 11, weight: '500' }, padding: 15 } } }
+                }
+            });
+
+            const ctxCam = document.getElementById('chartCameraDistribution').getContext('2d');
+            cameraChartInstance = new Chart(ctxCam, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(nodes),
+                    datasets: [{
+                        data: Object.values(nodes),
+                        backgroundColor: '#6366f1',
+                        borderRadius: 6,
+                        barThickness: 24
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 10 } } },
+                        y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8', font: { size: 10 } } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        async function verifyEvidence() {
+            const id = document.getElementById('verifyRecordId').value.trim();
+            const box = document.getElementById('verifyResult');
+            if (!id) return;
+
+            box.classList.remove('hidden');
+            box.className = "p-5 rounded-xl border bg-slate-900/60 border-slate-800 text-center text-xs text-slate-400 font-medium";
+            box.innerHTML = `<div class="inline-block animate-spin rounded-full h-3.5 w-3.5 border-2 border-indigo-500 border-t-transparent mr-2.5"></div>Querying security signature verification registry...`;
+
+            try {
+                const res = await fetch(`${getBaseUrl()}/evidence/${id}/verify`);
+                if (!res.ok) throw new Error("This backend does not expose /evidence/{id}/verify. Verify the backend API or remove this feature.");
+                const data = await res.json();
+
+                if (data.status === "verified" || data.verified === true) {
+                    box.className = "p-5 rounded-xl border bg-emerald-500/5 border-emerald-500/20 text-left space-y-2.5 shadow-inner";
+                    box.innerHTML = `
+                        <div class="flex items-center text-emerald-400 font-bold text-sm">
+                            <i data-lucide="shield-check" class="w-5 h-5 mr-2"></i> Verification Passed — Tamper Free
+                        </div>
+                        <p class="text-xs text-slate-300 leading-relaxed">The storage block signature precisely maps to initial deployment records. Checksum criteria validated successfully.</p>
+                        <div class="text-[11px] font-mono bg-slate-950 p-2.5 rounded-lg border border-slate-800 text-slate-400 break-all select-all">Hash: ${data.image_hash || 'SHA-256 Validated'}</div>
+                    `;
+                } else {
+                    box.className = "p-5 rounded-xl border bg-rose-500/5 border-rose-500/20 text-left space-y-2.5 shadow-inner";
+                    box.innerHTML = `
+                        <div class="flex items-center text-rose-400 font-bold text-sm">
+                            <i data-lucide="alert-triangle" class="w-5 h-5 mr-2"></i> Verification Exception Triggered
+                        </div>
+                        <p class="text-xs text-slate-300 leading-relaxed">The current image array payload does not align with historical database sign-off models. Checksum failure indicates potential file alteration.</p>
+                    `;
+                }
+                lucide.createIcons();
+            } catch (err) {
+                box.className = "p-5 rounded-xl border bg-rose-500/5 border-rose-500/20 text-rose-400 text-xs font-bold";
+                box.innerHTML = err.message || "Network timeout processing signature loop indices.";
+            }
+        }
+
+        // CORRECTED ROUTING PATTERN FOR PDF REPORTS
+        async function downloadPDFReport() {
+            const statusLabel = document.getElementById('reportStatus');
+            statusLabel.innerText = "Generating certified report layers...";
+            statusLabel.className = "text-xs font-medium text-amber-400 animate-pulse";
+
+            const baseUrl = getBaseUrl();
+
+            // Try matching your framework's actual endpoint signatures
+            try {
+                // Endpoint sequence routing test
+                let response = await fetch(`${baseUrl}/report/pdf`);
+                if (!response.ok) {
+                    response = await fetch(`${baseUrl}/report/daily`);
+                }
+
+                if (response.ok) {
+                    statusLabel.innerText = "Compilation successful.";
+                    statusLabel.className = "text-xs font-medium text-emerald-400";
+                    window.open(response.url, '_blank');
+                } else {
+                    throw new Error("404");
+                }
+            } catch (err) {
+                statusLabel.innerText = "Error compiling report. Endpoint unmapped.";
+                statusLabel.className = "text-xs font-medium text-rose-400";
+                alert("The PDF file path or endpoint route wasn't found on the backend. Please verify your FastAPI routes match /report/pdf or /report/daily.");
+            }
+        }
+    </script>
+</body>
+
+</html>

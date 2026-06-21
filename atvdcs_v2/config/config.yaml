@@ -1,0 +1,136 @@
+# ATVDCS Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+
+system:
+  name: "ATVDCS"
+  version: "1.0.0"
+  mode: "cpu"          # cpu | gpu | edge
+  log_level: "INFO"
+  evidence_dir: "evidence/"
+  reports_dir: "reports/"
+  data_dir: "data/"
+
+# ── Module 01: Image Preprocessing ───────────────────────────────────────────
+preprocessing:
+  target_size: [640, 640]
+  clahe:
+    clip_limit: 2.0
+    tile_grid_size: [8, 8]
+  denoise:
+    enabled: true
+    h: 10                   # filter strength
+  gamma_correction: 1.2
+  normalize:
+    mean: [0.485, 0.456, 0.406]
+    std: [0.229, 0.224, 0.225]
+
+# ── Module 02: Vehicle & Road User Detection ──────────────────────────────────
+detection:
+  model: "yolov8n"           # yolov8n (CPU-friendly) | yolov8x (GPU)
+  confidence_threshold: 0.25
+  iou_threshold: 0.45
+  device: "cpu"
+  classes:
+    0: "person"
+    1: "bicycle"
+    2: "car"
+    3: "motorcycle"
+    5: "bus"
+    7: "truck"
+
+# ── Module 03 & 04: Violation Detection & Classification ─────────────────────
+violation:
+  types:
+    - helmet_non_compliance
+    - seatbelt_non_compliance
+    - triple_riding
+    - wrong_side_driving
+    - stop_line_violation
+    - red_light_violation
+    - illegal_parking
+  thresholds:
+    auto_enforce: 0.90       # above this → ticket generated
+    secondary_check: 0.70    # 0.70-0.90 → secondary check
+    human_review: 0.70       # below this → human queue
+  helmet:
+    confidence: 0.85
+  illegal_parking:
+    stationary_seconds: 120  # seconds before flagged
+  triple_riding:
+    min_riders: 3
+
+# ── Module 05: License Plate Recognition ─────────────────────────────────────
+lpr:
+  detector_model: "yolov8n"  # fine-tuned for plates
+  ocr_engine: "paddleocr"    # paddleocr | trocr
+  min_plate_width_px: 40
+  max_angle_deg: 15
+  plate_format: "^[A-Z]{2}[0-9]{1,2}[A-Z]{1,3}[0-9]{4}$"   # Indian format
+  confidence_threshold: 0.70
+
+# ── Module 06: Evidence Generation ───────────────────────────────────────────
+evidence:
+  output_format: "png"       # png (lossless) | jpg (preview)
+  jpeg_quality: 85
+  annotation:
+    violation_color: [255, 0, 0]      # red
+    context_color: [255, 255, 0]      # yellow
+    text_scale: 0.6
+    line_thickness: 2
+  hash_algorithm: "sha256"
+  watermark: true
+
+# ── Module 07: Analytics & Reporting ─────────────────────────────────────────
+analytics:
+  db_url: "sqlite:///atvdcs.db"       # swap for PostgreSQL in production
+  retention_days: 365
+  dashboard_port: 8080
+  api_port: 8000
+  export_formats:
+    - csv
+    - pdf
+
+# ── Module 09: Repeat Offender Detection & Risk Scoring ──────────────────────
+offender_profiling:
+  half_life_days: 90              # recency decay half-life for risk scoring
+  saturation_k: 30                # higher = score climbs more slowly
+  variety_bonus_per_type: 4       # extra points per distinct violation type beyond the first
+  repeat_offender_min_violations: 2
+  severity_weights:               # 1 (minor) - 10 (severe); shared with risk_intelligence
+    red_light_violation: 10
+    wrong_side_driving: 9
+    triple_riding: 7
+    stop_line_violation: 6
+    helmet_non_compliance: 5
+    seatbelt_non_compliance: 4
+    illegal_parking: 3
+
+# ── Module 11: Traffic Risk Intelligence (Area Risk Score) ───────────────────
+risk_intelligence:
+  repeat_offender_min_violations: 2
+  component_weights:              # must sum to 1.0
+    volume: 0.35
+    severity: 0.25
+    repeat_offenders: 0.20
+    traffic_density: 0.20
+
+# ── Module 12: Predictive Violation Analytics ────────────────────────────────
+predictive_analytics:
+  history_window_days: 90         # lookback for hour-of-week frequency model
+  alert_probability_threshold: 0.6
+  forecast_window_hours: 2        # width of each predicted risk window
+
+# ── Module 08: Performance Evaluation ────────────────────────────────────────
+evaluation:
+  test_set_path: "data/test/"
+  iou_threshold_detection: 0.50
+  targets:
+    map_50: 0.92
+    f1_violation: 0.91
+    precision_violation: 0.93
+    recall_violation: 0.89
+    plate_accuracy: 0.93
+  mlflow:
+    enabled: false           # set true if MLflow server is running
+    tracking_uri: "mlruns/"
+    experiment_name: "ATVDCS_eval"

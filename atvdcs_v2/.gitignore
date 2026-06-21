@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual Environment
+venv/
+
+# Database
+*.db
+
+# Logs
+*.log
+
+# VS Code
+.vscode/
+
+# Evidence outputs
+evidence/
+
+# Reports
+reports/
+
+# Models (optional)
+*.pt
+
+# Environment variables
+.env
