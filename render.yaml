@@ -1,0 +1,11 @@
+services:
+  - type: web_service
+    name: ai-traffic-backend
+    env: docker
+    plan: free
+    root: atvdcs_v2
+    dockerfile_path: Dockerfile
+    start_command: "uvicorn api:app --host 0.0.0.0 --port $PORT"
+    env_vars:
+      - key: PORT
+        value: "8000"

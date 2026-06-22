@@ -27,6 +27,15 @@ The backend is container-ready and can be deployed to any container host such as
 - AWS App Runner
 - Azure App Service for Containers
 
+## Deploying to Render
+
+1. Push this repository to GitHub.
+2. In Render, create a new Web Service and connect your GitHub repo.
+3. Use the Docker deployment option and set the Dockerfile path to `atvdcs_v2/Dockerfile`.
+4. Set the root directory to `/` and deploy from branch `main`.
+5. The service should start with `uvicorn api:app --host 0.0.0.0 --port ${PORT:-8000}`.
+6. Once deployed, your backend URL will typically be `https://ai-traffic-backend.onrender.com` if that name is available.
+
 ## Notes
 
 - The service exposes `uvicorn api:app --host 0.0.0.0 --port 8000`.
