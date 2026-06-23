@@ -85,9 +85,22 @@ class LicensePlateRecognizer:
         self.plate_re           = re.compile(
             r"^[A-Z]{2}[-]?\d{1,2}[-]?[A-Z]{1,3}[-]?\d{4}$"
         )
+        self.low_memory: bool   = cfg.get("system", {}).get("low_memory", False)
+        self.ocr_engine_name: str = lpr["ocr_engine"]
+        self.detector_model_name: str = lpr["detector_model"]
 
-        self._ocr = self._load_ocr(lpr["ocr_engine"])
-        self._detector = self._load_plate_detector(lpr["detector_model"])
+        self._ocr_engine = None
+        self._detector_model = None
+
+    def _get_ocr(self):
+        if self._ocr_engine is None:
+            self._ocr_engine = self._load_ocr(self.ocr_engine_name)
+        return self._ocr_engine
+
+    def _get_detector(self):
+        if self._detector_model is None:
+            self._detector_model = self._load_plate_detector(self.detector_model_name)
+        return self._detector_model
 
     # ── Public API ───────────────────────────────────────────────────────────
 
@@ -117,7 +130,7 @@ class LicensePlateRecognizer:
         self, image: np.ndarray
     ) -> List[Tuple[np.ndarray, Tuple[int, int, int, int]]]:
         """Returns list of (cropped_plate, bbox_in_original)."""
-        kind, model = self._detector
+        kind, model = self._get_detector()
 
         if kind == "yolo":
             return self._yolo_detect(model, image)
@@ -166,7 +179,7 @@ class LicensePlateRecognizer:
     def _run_ocr(
         self, crop: np.ndarray, bbox: Tuple[int, int, int, int]
     ) -> PlateResult:
-        kind, engine = self._ocr
+        kind, engine = self._get_ocr()
         raw_text = ""
         confidence = 0.0
 
@@ -245,6 +258,9 @@ class LicensePlateRecognizer:
     # ── Loaders ──────────────────────────────────────────────────────────────
 
     def _load_plate_detector(self, model_name: str):
+        if self.low_memory:
+            logger.info("Low memory mode enabled: using heuristic plate detector fallback")
+            return ("heuristic", None)
         try:
             from ultralytics import YOLO
             model = YOLO(f"{model_name}.pt")
@@ -255,6 +271,9 @@ class LicensePlateRecognizer:
             return ("heuristic", None)
 
     def _load_ocr(self, engine_name: str):
+        if self.low_memory:
+            logger.info("Low memory mode enabled: using mock OCR fallback")
+            return ("mock", None)
         if engine_name == "paddleocr":
             try:
                 from paddleocr import PaddleOCR

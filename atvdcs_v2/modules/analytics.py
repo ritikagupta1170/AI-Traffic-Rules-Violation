@@ -22,13 +22,28 @@ from dataclasses import asdict
 from typing import List, Optional, Dict, Any, Tuple
 
 import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
-import seaborn as sns
 
 from modules.evidence import ViolationRecord
 
 logger = logging.getLogger(__name__)
+
+
+def _import_pandas():
+    try:
+        import pandas as pd
+    except ImportError as exc:
+        raise RuntimeError("pandas is required for analytics features") from exc
+    return pd
+
+
+def _import_matplotlib():
+    try:
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+    except ImportError as exc:
+        raise RuntimeError("matplotlib and seaborn are required for analytics plotting") from exc
+    return plt, sns
+
 
 # ── Schema ────────────────────────────────────────────────────────────────────
 
@@ -141,6 +156,7 @@ class AnalyticsDB:
 
         where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
         sql = f"SELECT * FROM violations {where} ORDER BY timestamp DESC LIMIT {limit}"
+        pd = _import_pandas()
         with self._conn() as conn:
             df = pd.read_sql_query(sql, conn, params=params)
         return df
@@ -181,6 +197,9 @@ class AnalyticsDB:
         self, days: int = 30, output_path: Optional[str] = None
     ) -> str:
         since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        pd = _import_pandas()
+        plt, sns = _import_matplotlib()
+
         df = self.query(start_ts=since, limit=50_000)
         path = output_path or str(self.reports_dir / f"trend_{_ts()}.png")
 
@@ -207,6 +226,9 @@ class AnalyticsDB:
         self, days: int = 7, output_path: Optional[str] = None
     ) -> str:
         since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        pd = _import_pandas()
+        plt, sns = _import_matplotlib()
+
         df = self.query(start_ts=since, limit=50_000)
         path = output_path or str(self.reports_dir / f"dist_{_ts()}.png")
 
@@ -227,6 +249,9 @@ class AnalyticsDB:
     def plot_confidence_histogram(
         self, output_path: Optional[str] = None
     ) -> str:
+        pd = _import_pandas()
+        plt, sns = _import_matplotlib()
+
         df = self.query(limit=5_000)
         path = output_path or str(self.reports_dir / f"conf_hist_{_ts()}.png")
 
@@ -313,6 +338,7 @@ def _ts() -> str:
 
 
 def _save_placeholder(path: str, message: str):
+    plt, _ = _import_matplotlib()
     fig, ax = plt.subplots(figsize=(6, 3))
     ax.text(0.5, 0.5, message, ha="center", va="center", transform=ax.transAxes)
     ax.axis("off")

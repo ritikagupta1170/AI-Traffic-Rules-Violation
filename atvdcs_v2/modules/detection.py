@@ -97,8 +97,9 @@ class VehicleDetector:
         self.class_filter: Dict[int, str] = {
             int(k): v for k, v in det["classes"].items()
         }
+        self.low_memory: bool   = cfg.get("system", {}).get("low_memory", False)
 
-        self._model = self._load_model()
+        self._model = None
 
     # ── Public API ───────────────────────────────────────────────────────────
 
@@ -140,7 +141,15 @@ class VehicleDetector:
 
     # ── Internal ─────────────────────────────────────────────────────────────
 
+    def _get_model(self):
+        if self._model is None:
+            self._model = self._load_model()
+        return self._model
+
     def _load_model(self):
+        if self.low_memory:
+            logger.info("Low memory mode enabled: using mock detector fallback")
+            return ("mock", None)
         try:
             from ultralytics import YOLO
             logger.info("Loading YOLOv8 model: %s on %s", self.model_name, self.device)
@@ -154,7 +163,7 @@ class VehicleDetector:
             return ("mock", None)
 
     def _run_inference(self, image: np.ndarray) -> List[Detection]:
-        kind, model = self._model
+        kind, model = self._get_model()
 
         if kind == "yolo":
             return self._yolo_inference(model, image)

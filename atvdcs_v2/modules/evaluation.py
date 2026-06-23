@@ -20,8 +20,6 @@ import json
 import yaml
 import logging
 import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple, Any
 from dataclasses import dataclass, field
@@ -279,7 +277,12 @@ class PipelineEvaluator:
         report: EvalReport,
         output_path: Optional[str] = None,
     ) -> str:
-        import seaborn as sns
+        try:
+            import matplotlib.pyplot as plt
+            import seaborn as sns
+        except ImportError:
+            return output_path or str(self.reports_dir / "confusion_matrix.png")
+
         cm = report.violation.confusion_matrix
         names = report.violation.class_names
         path = output_path or str(self.reports_dir / "confusion_matrix.png")

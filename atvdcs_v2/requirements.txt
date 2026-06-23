@@ -1,47 +1,12 @@
-# Core ML & Vision
-torch>=2.0.0
-torchvision>=0.15.0
-ultralytics>=8.0.0       # YOLOv8
-opencv-python>=4.8.0
-Pillow>=10.0.0
-numpy>=1.24.0
-scipy>=1.11.0
-
-# OCR
-paddlepaddle>=2.5.0
-paddleocr>=2.7.0
-transformers>=4.30.0     # TrOCR
-
-# Image Enhancement
-scikit-image>=0.21.0
-
-# Database
-psycopg2-binary>=2.9.0
-sqlalchemy>=2.0.0
-
-# Message Queue (optional for dev)
-kafka-python>=2.0.0
-
-# MLOps
-mlflow>=2.5.0
-
-# API & Dashboard
+# Minimal runtime dependencies for Railway / low-memory deployment
 fastapi>=0.100.0
 uvicorn>=0.23.0
 python-multipart>=0.0.6
 pydantic>=2.0.0
-
-# Monitoring
-prometheus-client>=0.17.0
-
-# Reporting
-reportlab>=4.0.0
+opencv-python>=4.8.0
+numpy>=1.24.0
 pandas>=2.0.0
-matplotlib>=3.7.0
-seaborn>=0.12.0
-
-# Utilities
-python-dotenv>=1.0.0
-loguru>=0.7.0
-tqdm>=4.65.0
 pyyaml>=6.0.0
+
+# Optional full-stack features are in requirements-full.txt
+

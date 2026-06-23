@@ -15,12 +15,15 @@ Endpoints:
   GET  /health           – liveness check
 """
 
+from modules import offender_profiling
+from modules import offender_profiling
 import io
 import uuid
 import logging
+import importlib
 from typing import Optional, List
 from datetime import datetime
-
+from fastapi.encoders import jsonable_encoder
 import cv2
 import numpy as np
 
@@ -30,10 +33,6 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
 from pipeline import ATVDCSPipeline
-from modules.offender_profiling import OffenderProfiler
-from modules.hotspot_analytics import HotspotAnalyzer
-from modules.risk_intelligence import AreaRiskScorer
-from modules.predictive_analytics import PredictiveAnalyzer
 from modules.explainability import explain_record
 from modules.evidence import EvidenceGenerator, ViolationRecord
 
@@ -41,10 +40,43 @@ logger = logging.getLogger("atvdcs.api")
 
 # Single shared pipeline instance (modules loaded once)
 pipeline: Optional[ATVDCSPipeline] = None
-offender_profiler: Optional[OffenderProfiler] = None
-hotspot_analyzer: Optional[HotspotAnalyzer] = None
-area_risk_scorer: Optional[AreaRiskScorer] = None
-predictive_analyzer: Optional[PredictiveAnalyzer] = None
+offender_profiler = None
+hotspot_analyzer = None
+area_risk_scorer = None
+predictive_analyzer = None
+
+
+def _get_offender_profiler():
+    global offender_profiler
+    if offender_profiler is None:
+        from modules.offender_profiling import OffenderProfiler
+        offender_profiler = OffenderProfiler()
+    return offender_profiler
+
+
+def _get_hotspot_analyzer():
+    global hotspot_analyzer
+    if hotspot_analyzer is None:
+        from modules.hotspot_analytics import HotspotAnalyzer
+        hotspot_analyzer = HotspotAnalyzer()
+    return hotspot_analyzer
+
+
+def _get_area_risk_scorer():
+    global area_risk_scorer
+    if area_risk_scorer is None:
+        from modules.risk_intelligence import AreaRiskScorer
+        area_risk_scorer = AreaRiskScorer()
+    return area_risk_scorer
+
+
+def _get_predictive_analyzer():
+    global predictive_analyzer
+    if predictive_analyzer is None:
+        from modules.predictive_analytics import PredictiveAnalyzer
+        predictive_analyzer = PredictiveAnalyzer()
+    return predictive_analyzer
+
 
 app = FastAPI(
     title="ATVDCS API",
@@ -64,13 +96,9 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup():
-    global pipeline, offender_profiler, hotspot_analyzer, area_risk_scorer, predictive_analyzer
+    global pipeline
     logger.info("Loading ATVDCS pipeline …")
     pipeline = ATVDCSPipeline()
-    offender_profiler = OffenderProfiler()
-    hotspot_analyzer = HotspotAnalyzer()
-    area_risk_scorer = AreaRiskScorer()
-    predictive_analyzer = PredictiveAnalyzer()
     logger.info("API ready")
 
 
@@ -160,33 +188,70 @@ async def process_image(
 
 @app.get("/violations")
 def get_violations(
-    camera_id:       Optional[str] = None,
+    camera_id: Optional[str] = None,
     violation_class: Optional[str] = None,
-    plate_text:      Optional[str] = None,
-    disposition:     Optional[str] = None,
-    start_ts:        Optional[str] = None,
-    end_ts:          Optional[str] = None,
-    limit:           int = 100,
+    plate_text: Optional[str] = None,
+    disposition: Optional[str] = None,
+    start_ts: Optional[str] = None,
+    end_ts: Optional[str] = None,
+    limit: int = 100,
 ):
-    """
-    Query stored violation records with optional filters.
-
-    Returns a JSON array of violation records.
-    """
     if pipeline is None:
         raise HTTPException(503, "Pipeline not ready")
 
-    df = pipeline.analytics_db.query(
-        camera_id=camera_id,
-        violation_class=violation_class,
-        plate_text=plate_text,
-        disposition=disposition,
-        start_ts=start_ts,
-        end_ts=end_ts,
-        limit=limit,
-    )
-    return JSONResponse(content=df.to_dict(orient="records"))
+    try:
+        import pandas as pd
+        import numpy as np
+        import json
 
+        df = pipeline.analytics_db.query(
+            camera_id=camera_id,
+            violation_class=violation_class,
+            plate_text=plate_text,
+            disposition=disposition,
+            start_ts=start_ts,
+            end_ts=end_ts,
+            limit=limit,
+        )
+
+        # Convert NaN/Inf everywhere
+        df = df.astype(object)
+
+        df = df.replace({
+            np.nan: None,
+            np.inf: None,
+            -np.inf: None
+        })
+
+        records = df.to_dict(orient="records")
+
+        # Clean nested structures recursively
+        def clean(obj):
+            if isinstance(obj, dict):
+                return {k: clean(v) for k, v in obj.items()}
+
+            if isinstance(obj, list):
+                return [clean(v) for v in obj]
+
+            if isinstance(obj, float):
+                if np.isnan(obj) or np.isinf(obj):
+                    return None
+
+            return obj
+
+        records = clean(records)
+
+        # Validate JSON before returning
+        json.dumps(records, allow_nan=False)
+
+        return records
+
+    except Exception as e:
+        logger.exception("Failed to fetch violations")
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
 
 @app.get("/stats", response_model=StatsResponse)
 def get_stats(days: int = Query(7, ge=1, le=365)):
@@ -238,7 +303,7 @@ def export_csv(
 def recompute_offenders():
     """Recompute risk scores for every plate. Call after a batch of new
     evidence, or on a schedule (cron/APScheduler) in production."""
-    n = offender_profiler.recompute_all()
+    n = _get_offender_profiler().recompute_all()
     return {"plates_scored": n}
 
 
@@ -246,14 +311,14 @@ def recompute_offenders():
 def top_offenders(limit: int = Query(20, ge=1, le=200),
                    min_violations: Optional[int] = None):
     """Top Repeat Offenders leaderboard, sorted by Vehicle Risk Score (0-100)."""
-    df = offender_profiler.top_offenders(limit=limit, min_violations=min_violations)
+    df = _get_offender_profiler().top_offenders(limit=limit, min_violations=min_violations)
     return JSONResponse(content=df.to_dict(orient="records"))
 
 
 @app.get("/offenders/{plate_text}")
 def offender_profile(plate_text: str):
     """Full offender profile for a single plate: history, breakdown, risk tier."""
-    profile = offender_profiler.get_profile(plate_text.upper())
+    profile = _get_offender_profiler().get_profile(plate_text.upper())
     if not profile:
         raise HTTPException(404, "No profile found for this plate")
     return JSONResponse(content=profile)
@@ -267,32 +332,32 @@ def register_camera(camera_id: str, junction_name: str, location_name: str,
                      traffic_density: float = 0.5):
     """Register/update a camera's junction name, location and GPS for
     human-readable hotspot labels and heatmap plotting."""
-    hotspot_analyzer.upsert_camera(camera_id, junction_name, location_name, lat, lon, traffic_density)
+    _get_hotspot_analyzer().upsert_camera(camera_id, junction_name, location_name, lat, lon, traffic_density)
     return {"status": "ok", "camera_id": camera_id}
 
 
 @app.get("/hotspots/ranking")
 def hotspot_ranking(days: int = Query(30, ge=1, le=365), limit: int = Query(20, ge=1, le=200)):
     """Ranked list of worst locations by violation count."""
-    return JSONResponse(content=hotspot_analyzer.hotspot_ranking(days=days, limit=limit))
+    return JSONResponse(content=_get_hotspot_analyzer().hotspot_ranking(days=days, limit=limit))
 
 
 @app.get("/hotspots/heatmap")
 def hotspot_heatmap(days: int = Query(30, ge=1, le=365)):
     """Heatmap-ready points: [{lat, lon, weight, camera_id, location_label}]."""
-    return JSONResponse(content=hotspot_analyzer.heatmap_points(days=days))
+    return JSONResponse(content=_get_hotspot_analyzer().heatmap_points(days=days))
 
 
 @app.get("/hotspots/trends")
 def hotspot_trends(days: int = Query(30, ge=1, le=365)):
     """Hourly / day-of-week / weekly / monthly violation trend series + peak hour."""
-    return JSONResponse(content=hotspot_analyzer.trends(days=days))
+    return JSONResponse(content=_get_hotspot_analyzer().trends(days=days))
 
 
 @app.get("/hotspots/peak-periods")
 def hotspot_peak_periods(days: int = Query(30, ge=1, le=365)):
     """Peak violation window per (location, violation type) — drives alert copy."""
-    return JSONResponse(content=hotspot_analyzer.peak_period_by_location(days=days))
+    return JSONResponse(content=_get_hotspot_analyzer().peak_period_by_location(days=days))
 
 
 # ── Traffic Risk Intelligence (Module 11) ────────────────────────────────────
@@ -300,14 +365,14 @@ def hotspot_peak_periods(days: int = Query(30, ge=1, le=365)):
 @app.post("/risk/areas/recompute")
 def recompute_area_risk(days: int = Query(30, ge=1, le=365)):
     """Recompute Area Risk Scores (volume + severity + repeat offenders + density)."""
-    rows = area_risk_scorer.compute(days=days)
+    rows = _get_area_risk_scorer().compute(days=days)
     return {"locations_scored": len(rows)}
 
 
 @app.get("/risk/areas")
 def area_risk_ranking(days: int = Query(30, ge=1, le=365), limit: int = Query(20, ge=1, le=200)):
     """Ranked locations by Area Risk Score (0-100)."""
-    return JSONResponse(content=area_risk_scorer.ranking(days=days, limit=limit))
+    return JSONResponse(content=_get_area_risk_scorer().ranking(days=days, limit=limit))
 
 
 # ── Predictive Violation Analytics (Module 12) ───────────────────────────────
@@ -316,13 +381,13 @@ def area_risk_ranking(days: int = Query(30, ge=1, le=365), limit: int = Query(20
 def predictive_alerts(horizon_hours: int = Query(24, ge=1, le=168)):
     """Forecast the next N hours and return alerts for high-probability
     (location, violation type, time-window) combinations."""
-    return JSONResponse(content=predictive_analyzer.forecast_next_hours(horizon_hours=horizon_hours))
+    return JSONResponse(content=_get_predictive_analyzer().forecast_next_hours(horizon_hours=horizon_hours))
 
 
 @app.get("/predictions/recent")
 def recent_predictions(limit: int = Query(20, ge=1, le=200)):
     """Most recently generated predictive alerts (persisted history)."""
-    return JSONResponse(content=predictive_analyzer.recent_alerts(limit=limit))
+    return JSONResponse(content=_get_predictive_analyzer().recent_alerts(limit=limit))
 
 
 # ── Explainable AI (Module 13) ───────────────────────────────────────────────

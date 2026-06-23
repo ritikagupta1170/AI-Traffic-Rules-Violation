@@ -5,6 +5,7 @@ system:
   name: "ATVDCS"
   version: "1.0.0"
   mode: "cpu"          # cpu | gpu | edge
+  low_memory: true     # Run with mock/heuristic models to conserve RAM
   log_level: "INFO"
   evidence_dir: "evidence/"
   reports_dir: "reports/"

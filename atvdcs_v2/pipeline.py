@@ -31,7 +31,6 @@ from modules.violation_classifier import ViolationClassifier
 from modules.lpr                 import LicensePlateRecognizer
 from modules.evidence            import EvidenceGenerator
 from modules.analytics           import AnalyticsDB
-from modules.evaluation          import PipelineEvaluator
 
 # ── Logging setup ─────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -67,8 +66,6 @@ class ATVDCSPipeline:
         self.evidence_gen   = EvidenceGenerator(config_path)
         # Module 07
         self.analytics_db   = AnalyticsDB(config_path)
-        # Module 08
-        self.evaluator      = PipelineEvaluator(config_path)
 
         logger.info("Pipeline ready ✓")
 
