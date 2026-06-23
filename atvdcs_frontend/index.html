@@ -45,7 +45,7 @@
                 <div class="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></div>
                 <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Node IP</span>
             </div>
-            <input id="apiHost" type="text" value="http://127.0.0.1:8000"
+            <input id="apiHost" type="text" value="https://ai-traffic-rules-violation-production-67d6.up.railway.app"
                 class="bg-slate-950 text-xs font-mono border border-slate-700/60 rounded-lg px-3 py-1.5 text-indigo-400 focus:outline-none focus:border-indigo-500 transition w-44">
             <button onclick="checkSystemHealth()"
                 class="bg-slate-800 hover:bg-slate-700 text-slate-300 p-2 rounded-lg transition">
@@ -338,6 +338,7 @@
     <script>
         let typeChartInstance = null;
         let cameraChartInstance = null;
+        
 
         document.addEventListener('DOMContentLoaded', () => {
             lucide.createIcons();
