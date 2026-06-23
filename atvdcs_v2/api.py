@@ -431,4 +431,4 @@ def verify_evidence(record_id: str):
 
 @app.get("/autodeploy-test")
 def autodeploy_test():
-    return {"status": "Auto deploy works"}
+    return {"status": "Auto deploy"}
