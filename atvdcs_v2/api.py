@@ -428,3 +428,7 @@ def verify_evidence(record_id: str):
         preview_image_path=row["preview_image_path"], metadata=_json.loads(row["metadata"]),
     )
     return JSONResponse(content=EvidenceGenerator.verify_integrity(record))
+
+@app.get("/autodeploy-test")
+def autodeploy_test():
+    return {"status": "Auto deploy works"}
